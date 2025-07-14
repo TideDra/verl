@@ -31,6 +31,8 @@ from verl.utils.rollout_trace import rollout_trace_op
 from .base_tool import BaseTool
 from .schemas import OpenAIFunctionToolSchema
 
+from transformers import AutoTokenizer
+
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
@@ -179,6 +181,9 @@ class SearchTool(BaseTool):
         if self.retrieval_service_url == "":
             raise ValueError("retrieval_service_url is not set")
 
+        self.tokenizer = AutoTokenizer.from_pretrained(config.get("tokenizer_path"))
+        self.max_retrieve_tokens = config.get("max_retrieve_tokens", -1)
+
         logger.info(f"Initialized SearchTool with config: {config}")
 
     def get_openai_tool_schema(self) -> OpenAIFunctionToolSchema:
@@ -222,6 +227,12 @@ class SearchTool(BaseTool):
             concurrent_semaphore=None,  # Ray handles concurrency control
             timeout=timeout,
         )
+        if self.max_retrieve_tokens > 0:
+            result_content = json.loads(result_text)["result"]
+            result_tokens = self.tokenizer.encode(result_content, max_length=self.max_retrieve_tokens,  truncation=True)
+            truncated_result_content = self.tokenizer.decode(result_tokens)
+            result_text = json.dumps({"result": truncated_result_content})
+
         logger.debug(f"Search result for instance {instance_id}: {result_text}")
         return result_text, metadata
 
