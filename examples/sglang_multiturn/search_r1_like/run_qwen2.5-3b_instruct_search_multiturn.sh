@@ -9,14 +9,21 @@ PROJECT_DIR="$(pwd)"
 CONFIG_PATH="$PROJECT_DIR/examples/sglang_multiturn/config"
 
 
-TRAIN_DATA="$HOME/data/searchR1_processed_direct/train.parquet"
-VAL_DATA="$HOME/data/searchR1_processed_direct/test.parquet"
+TRAIN_DATA="./data/searchR1_processed_direct/train.parquet"
+VAL_DATA="./data/searchR1_processed_direct/test.parquet"
 
 TOOL_CONFIG="$CONFIG_PATH/tool_config/search_tool_config.yaml"
 
+MODEL_PATH="./checkpoints/Qwen2.5-3B-Instruct"
 
+#if USE_MULTINODE=1, then set alias launch='ray job submit', else launch='python3 -m'
+if [ "$USE_MULTINODE" -eq 1 ]; then
+    launch='ray job submit --address="http://localhost:8265" --runtime-env=verl/trainer/runtime_env.yaml -- python3 -m'
+else
+    launch='python3 -m'
+fi
 
-python3 -m verl.trainer.main_ppo \
+$launch verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='search_multiturn_grpo' \
     algorithm.adv_estimator=grpo \
@@ -27,7 +34,7 @@ python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-3B-Instruct \
+    actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.285 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -44,7 +51,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.n=5 \
     actor_rollout_ref.rollout.multi_turn.max_assistant_turns=2 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=8 \
@@ -57,7 +64,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name='qwen2.5-3b-instruct_function_rm-search-async-sgl-multi-w-searchtool-verify-n16' \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
+    trainer.save_freq=50 \
     trainer.test_freq=50 \
     data.train_files="$TRAIN_DATA" \
     data.val_files="$VAL_DATA"  \

@@ -1,0 +1,50 @@
+description: run verl
+ 
+target:
+  service: singularity
+  name: Dalle-Designer-New
+  workspace_name: t2vgws2
+ 
+environment:
+  image: tidedra/verl:latest
+ 
+storage:
+  output:
+    storage_account_name: t2vgusw2
+    container_name: gongrui
+    mount_dir: /mnt/gongrui
+
+code:
+  # local_dir: $CONFIG_DIR/../upload_expdir/
+  local_dir: $CONFIG_DIR/../../
+  ignore:
+  - .venv
+  - .vscode
+  - data
+  - checkpoints
+  - logs
+  - outputs
+  - "*.egg-info"
+  - wandb
+  - "*.log"
+  - "*.ipynb"
+
+jobs:
+  # 2 nodes, 8 GPUs per node
+  - name: qwen2.5-3b-searchr1-grpo
+    sku: G8-A100
+    process_count_per_node: 0
+    execution_mode: Basic
+    priority: High # [High, Medium, Low]. On AMLK8s, the priority value is mapped to 200, 100, and 80, respectively.
+    sla_tier: premium               # [premium, standard, basic]
+    submit_args:
+      container_args:
+        shm_size: 8192g
+      env:
+        SHARED_MEMORY_PERCENT: 0.5
+    identity: user
+    command:
+      - wandb login $WANDB_API_KEY
+      - bash examples/amlt/setup.sh
+      - bash examples/amlt/launch_retriever.sh
+      - bash examples/sglang_multiturn/search_r1_like/run_qwen2.5-3b_instruct_search_multiturn.sh trainer.experiment_name=$${AMLT_JOB_NAME}
