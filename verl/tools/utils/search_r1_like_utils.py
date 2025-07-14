@@ -131,10 +131,15 @@ def _passages2string(retrieval_result):
     """Convert retrieval results to formatted string."""
     format_reference = ""
     for idx, doc_item in enumerate(retrieval_result):
-        content = doc_item["document"]["contents"]
-        title = content.split("\n")[0]
-        text = "\n".join(content.split("\n")[1:])
-        format_reference += f"Doc {idx + 1} (Title: {title})\n{text}\n\n"
+        if isinstance(doc_item["document"], dict):
+            content = doc_item["document"]["contents"]
+            title = content.split("\n")[0]
+            text = "\n".join(content.split("\n")[1:])
+            format_reference += f"Doc {idx + 1} (Title: {title})\n{text}\n\n"
+        elif isinstance(doc_item["document"], str):
+            format_reference += f"Doc {idx + 1}:\n {doc_item['document']}\n\n"
+        else:
+            raise ValueError(f"Unknown document type: {type(doc_item['document'])}")
     return format_reference.strip()
 
 
