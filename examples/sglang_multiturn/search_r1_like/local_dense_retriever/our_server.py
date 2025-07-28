@@ -19,7 +19,7 @@ import argparse
 import json
 import warnings
 from typing import List, Optional
-
+from copy import deepcopy
 import datasets
 import faiss
 import numpy as np
@@ -54,28 +54,37 @@ def get_top_doc(text):
         # something must be wrong
         return text
 
-def load_docs(corpus, doc_idxs, chunk_merge_method = "top"):
+def load_docs(corpus, doc_idxs, chunk_merge_method = "chunk"):
     """
     zms updated
-    chunk_merge_method: top / chunk / merge
+    chunk_merge_method: chunk / merge
+    return is a dict :
+    {
+        'text': xxxx
+        'meta': {}
+    }
     """
-    if chunk_merge_method == "top":
-        origin_index = [corpus[int(idx)]['meta']['origin_file_index'] for idx in doc_idxs]
-        results = [corpus[int(idx)]['text'] for idx in origin_index]
-    elif chunk_merge_method == "chunk":
-        results = [corpus[int(idx)]['text'] for idx in doc_idxs]
+    if chunk_merge_method == "chunk":
+        results = []
+        for idx in doc_idxs:
+            corpus[int(idx)]['meta']['index'] = int(idx)
+            results.append(corpus[int(idx)])
     elif chunk_merge_method == "merge":
         results = []
         for idx in doc_idxs:
             if corpus[int(idx)]['meta']['origin_file_index'] == idx:
                 # this means the chunk is the first chunk in the original doc, or words(doc) < 256
-                results.append(corpus[int(idx)]['text'])
+                corpus[int(idx)]['meta']['index'] = int(idx)
+                results.append(corpus[int(idx)])
             else:
                 assert corpus[int(idx)]['meta']['origin_file_index'] < idx
                 origin_doc = corpus[int(corpus[int(idx)]['meta']['origin_file_index'])]
                 chunk_doc = corpus[int(idx)]
                 doc = get_top_doc(origin_doc['text']) + "\n......\n" + chunk_doc['text']
-                results.append(doc)
+                res = deepcopy(chunk_doc)
+                res["text"] = doc
+                res['meta']['index'] = int(idx)
+                results.append(res)
     return results
 
 
@@ -427,7 +436,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--topk", type=int, default=3, help="Number of retrieved passages for one query.")
     parser.add_argument("--retriever_name", type=str, default="e5", help="Name of the retriever model.")
-    parser.add_argument("--chunk_merge_method", type=str, default="top", choices=['top', 'chunk', 'merge'], help="Name of the retriever model.")
+    parser.add_argument("--chunk_merge_method", type=str, default="chunk", choices=['chunk', 'merge'], help="Name of the retriever model.")
     parser.add_argument(
         "--retriever_model", type=str, default="intfloat/e5-base-v2", help="Path of the retriever model."
     )
